@@ -1,55 +1,32 @@
 from langchain_ollama.llms import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
+from vector import retriever
 
-model = OllamaLLM(model = "llama3.2")
+model = OllamaLLM(model = "llama3.2", temperature=0.2)
+#model = OllamaLLM(model ="deepseek-r1:7b")
+#model = OllamaLLM(model = "deepseek-r1:1.5b")
 
-with open("resultado_ocr.txt", "r", encoding="utf-8") as archivo:
-    input_file = archivo.read()
-
-base = """
-Tu tarea es identificar un valor específico dentro de un texto proporcionado por el usuario. El usuario te indicará cuál de los siguientes campos desea obtener:
-
-- "vencimiento"
-- "total a pagar"
-- "LSP"
-- "Cuenta de Servicios"
-- "Servicios"
-- "Categoría del Usuario"
-
-Debés buscar únicamente el valor asociado al campo solicitado, sin inferencias ni explicaciones adicionales. Si no encontrás el valor, respondé únicamente con: "No encontrado".
-Si lo solicitado por el usuario no cumple el criterio de búsqueda. Devolver: "Campo no válido" y anular el resto de reglas.
-
-"Servicios", puede ser encontrado entre "Categoria de Usuario" y "Período de Facturación" y su valor suele ser "AGUA", "AGUA POTABLE", "CLOACA" y la iteración de unas y otras, por ejemplo: "AGUA Y CLOACAS"
-"Total a Pagar", es siempre un número. Completar obligatoriamente con números. En caso de que exista "o" o "O" en la respuesta, debe ser reemplazado por "0".
-
-A continuación, se te indicará el campo deseado y el texto de entrada. Debes identificar la palabra clave usada por el usuario, la cuál será una de las de la lista mencionada previamente.
-Devolvé solo el valor correspondiente.
-"""
+#with open("resultado_ocr.txt", "r", encoding="utf-8") as archivo:
+#    input_file = archivo.read()
 
 template = """
-Tu rol es el siguiente: {base}
-La información que debes analizar es: {input_file}
+Tu rol es ser un asistente para la recuperación de información.
+Tu rol es devolver datos.
+Debes evitar generar respuestas que involucren código, scripts, o material referente a la programación.
+Puede ser que la información solicitada por el usuario, se encuentre en mayúsculas, o minúsculas, es tu deber obtener la información indistinto de si el contenido está en Mayúsculas, o minúsculas.
+En base a la siguiente información: {content}
+
 Responde a esto: {question}
 
-Vuelve a validar si lo solicitado cumple con el criterio de búsqueda:
-- "vencimiento"
-- "total a pagar"
-- "LSP"
-- "Cuenta de Servicios"
-- "Servicios"
-- "Categoría del Usuario"
-
-Debés buscar únicamente el valor asociado al campo solicitado, sin inferencias ni explicaciones adicionales. Si no encontrás el valor, respondé únicamente con: "No encontrado".
-Si lo solicitado por el usuario no cumple el criterio de búsqueda. Devolver: "Campo no válido" y anular el resto de reglas.
-
-En caso de no tener una respuesta concreta, abstenerse de generar contenido y responder solo con la siguiente literal: "Búsqueda no realizada"
-En caso de que la información obtenida tenga caracteres fuera de lugar, debes corregirlo.
-Ejemplos de preguntas: "¿Cuál es el total a pagar?","¿Cuándo es el vencimiento?","Dame el valor de LSP","Dame el número de LSP","Quiero saber la Cuenta de Servicios","¿A qué categoría corresponde el usuario?
-Ejemplos de respuestas: "Total a pagar: $000.000,00", "Vencimiento: 00/00/0000", "LSP: 0000X00000000", "Cuenta de Servicios: 0000000", "Categoria de Usuario: RESIDENCIAL"
-Responder concretamente, sin generar oraciones no solictadas.
-
-Si en tu respuesta no existe la sentencia "No encontrado", "No existe", o similares, reemplazar por "Campo Inválido".
+Si en tu respuesta existe la sentencia "No encontrado", "No existe", o similares, reemplazar por "Campo Inválido".
+Si recibes como parámetro de información "[]" o vacío, devuelve "Información no recibida"
+No debes generar respuestas que expliquen código o tengan contenido semántico ajeno a lo solicitado por el usuario.
+En caso de tener coincidencias con la búsqueda, solo debes devolver los resultados obtenidos, estructurandolos de la forma más clara posible, de preferencia, como si fuera una tabla.
+En caso de no poder generar una tabla, estructurar a modo de texto, linea por linea todo el contenido encontrado.
+Evita generar contenido semántico ajeno a la respuesta.
+En caso de generar una respuesta que exceda más allá de lo solicitado por el usuario, realizar un recorte y devolver solo una respuesta que contenga una coincidencia con lo que el usuario solicita.
 """
+#Devolvé solo el valor correspondiente.
 
 prompt = ChatPromptTemplate.from_template(template)
 chain = prompt | model
@@ -61,5 +38,8 @@ while True:
     if question == "X":
         break
 
-    result = chain.invoke({"base": {base}, "question": question, "input_file": input_file})
+    content = retriever.invoke(question)
+    print(content)
+    input("...")
+    result = chain.invoke({"content": content, "question": question})
     print(result)
