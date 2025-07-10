@@ -1,6 +1,5 @@
 import os
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
-
 from langchain_ollama import OllamaEmbeddings
 #from langchain_community.vectorstores import Chroma
 #from langchain.vectorstores import Chroma
@@ -8,6 +7,9 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import os
 import pandas as pd
+from langchain_ollama.llms import OllamaLLM
+from langchain_core.prompts import ChatPromptTemplate
+import json
 
 #aca va la lectura del documento
 #archivo = "C:/Users/bmorales/Downloads/BD-Adm&Finanzas-DS_Backup (1).xlsx"
@@ -17,8 +19,6 @@ archivo ="C:/Users/MarsuDIOS666/Desktop/llama/inputs/CSV UTF.csv"
 df = pd.read_csv(archivo, sep=';', encoding='utf-8', index_col=False)
 #df = pd.read_csv(archivo)
 print(df)
-print(df.shape)
-print(df.iloc[400])
 
 #embeddings = OllamaEmbeddings(model="mxbai_embed_large")
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
@@ -77,3 +77,49 @@ retriever = vector_store.as_retriever(
         "score_threshold": 0.6
     }
 )
+
+model = OllamaLLM(model = "llama3.2", temperature=0.1)
+#model = OllamaLLM(model ="deepseek-r1:7b")
+#model = OllamaLLM(model = "deepseek-r1:1.5b")
+
+#with open("resultado_ocr.txt", "r", encoding="utf-8") as archivo:
+#    input_file = archivo.read()
+
+template =""" Tu único rol es ser un asistente de recuperación de información.
+
+Debes limitarte exclusivamente a devolver datos directamente relacionados con la consulta del usuario, **sin agregar explicaciones, sin generar código, sin scripts, sin suposiciones, ni contenido adicional**. No estás autorizado a generar ningún bloque de código ni a razonar como programador.
+
+El contenido que recibís como información puede estar en mayúsculas, minúsculas o mezclado. Debes interpretar correctamente sin importar el formato.
+
+Debes responder únicamente en base a la siguiente información recibida: {content}
+
+Y a la siguiente pregunta del usuario: {question}
+
+📌 Instrucciones obligatorias:
+- Si el contenido recibido es vacío o igual a "[]", responde: **"Información no recibida"**.
+- Si no hay coincidencias relevantes en los datos, responde: **"Campo Inválido"**.
+- Si encontrás coincidencias, devuélvelas **sin ningún texto adicional**.
+- El formato preferido es **texto limpio y ordenado línea por línea**.
+- **No expliques ni interpretes los datos**.
+- En caso de múltiples coincidencias, **devuelve todas las coincidencias encontradas** que sea claro y preciso.
+- **No inventes respuestas ni completes información faltante**.
+
+Tu respuesta debe limitarse únicamente a lo solicitado. Todo lo que exceda eso debe ser omitido.
+"""
+
+
+prompt = ChatPromptTemplate.from_template(template)
+chain = prompt | model
+
+all_docs = vector_store.get()
+content = all_docs['documents']
+
+while True:
+    print("\n\n--------------------------------")
+    quest = input("Pregunta lo que quieras. (Presiona X para salir)... ")
+    print("\n\n")
+    if quest == "X":
+        break
+
+    result = chain.invoke({"content": content, "question": quest})
+    print(result)

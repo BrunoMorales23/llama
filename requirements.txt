@@ -2,3 +2,5 @@ langchain
 langchain-ollama
 langchain-chrome
 easyocr
+openpyxl
+langchain-community
